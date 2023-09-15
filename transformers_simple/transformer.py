@@ -3,7 +3,7 @@ from torch.nn import functional as F
 import numpy as np
 
 class MultiHeadAttention(torch.nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_heads,
+    def __init__(self, input_size, hidden_size, output_size, num_heads, block_size,
     activation=torch.nn.Identity()):
         super(MultiHeadAttention,self).__init__()
 
@@ -11,12 +11,16 @@ class MultiHeadAttention(torch.nn.Module):
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_heads = num_heads
+        self.block_size = block_size
         self.activation = activation
 
         self.Wa = torch.nn.Linear(input_size, num_heads*3*hidden_size, bias=False)
 
         self.Wout = torch.nn.Linear(hidden_size*num_heads, output_size)
 
+        self.mask = torch.tril(torch.ones(self.block_size, self.block_size)).view(
+        1,1,self.block_size,self.block_size
+        )
 
     def forward(self, x):
         """
@@ -30,7 +34,9 @@ class MultiHeadAttention(torch.nn.Module):
 
         q,k,v = torch.split(tmp, self.hidden_size, dim=3)
 
+        # A is (nb, num_heads, l, l)
         A = q @ k.transpose(-2,-1)/np.sqrt(self.hidden_size)
+        A = A.masked_fill(self.mask[:,:,:l,:l] ==0, float('-inf'))
         A = F.softmax(A,dim=-1)
 
         o = A @ v #(nb, num_heads, l, hidden_size)
@@ -41,3 +47,7 @@ class MultiHeadAttention(torch.nn.Module):
         o = self.activation(o)
 
         return o
+
+class TransformerBlock(torch.nn.Module):
+    def __init__(self):
+        pass
