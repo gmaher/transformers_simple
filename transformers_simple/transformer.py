@@ -49,5 +49,37 @@ class MultiHeadAttention(torch.nn.Module):
         return o
 
 class TransformerBlock(torch.nn.Module):
-    def __init__(self):
-        pass
+    def __init__(self, block_size, vec_size, hidden_size, attn_hidden_size,
+    output_size, num_heads, activation=torch.nn.Identity()):
+
+        super(TransformerBlock, self).__init__()
+
+        self.block_size = block_size
+        self.vec_size = vec_size
+        self.hidden_size = hidden_size
+        self.attn_hidden_size = attn_hidden_size
+        self.attn_output_size = vec_size
+        self.output_size = output_size
+        self.num_heads = num_heads
+        self.activation = activation
+
+        self.attn_module = MultiHeadAttention(input_size=self.vec_size,
+        hidden_size=self.hidden_size,
+        output_size=self.output_size,
+        num_heads=self.num_heads,
+        block_size=self.block_size)
+
+        self.fc1 = torch.nn.Linear(self.attn_output_size, self.hidden_size)
+        self.fc2 = torch.nn.Linear(self.hidden_size, self.output_size)
+
+        self.norm1 = torch.nn.LayerNorm(self.vec_size)
+        self.norm2 = torch.nn.LayerNorm(self.output_size)
+
+    def forward(self,x):
+        o = self.norm1(x)
+        o = self.attn_module(o)
+        o = self.norm2(x+o)
+        o = self.fc1(o)
+        o = self.activation(o)
+        o = self.fc2(o)
+        return x+o
