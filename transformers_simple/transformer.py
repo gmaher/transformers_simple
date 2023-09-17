@@ -104,7 +104,7 @@ class TransformerBlock(torch.nn.Module):
 class GPT(torch.nn.Module):
     def __init__(self, vocab_size, block_size, embed_size, hidden_size,
     attn_hidden_size, output_size, num_transformer_blocks, num_heads,
-    activation=torch.nn.LeakyReLU(0.05)):
+    embed_dropout=0.2, activation=torch.nn.LeakyReLU(0.05)):
         super(GPT, self).__init__()
 
         self.vocab_size = vocab_size
@@ -117,6 +117,8 @@ class GPT(torch.nn.Module):
         self.activation = activation
 
         self.embedder = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=embed_size)
+
+        self.embed_dropout = torch.nn.Dropout(embed_dropout)
 
         self.transformer_blocks = torch.nn.ModuleList()
         for n in range(num_transformer_blocks):
@@ -136,7 +138,7 @@ class GPT(torch.nn.Module):
         """
 
         o = self.embedder(x) #now (Nbatch, block_size, embed_size)
-
+        o = self.embed_dropout(o)
         for tb in self.transformer_blocks:
             o = tb(o)
 
