@@ -64,7 +64,7 @@ class TransformerBlock(torch.nn.Module):
         self.activation = activation
 
         self.attn_module = MultiHeadAttention(input_size=self.vec_size,
-        hidden_size=self.hidden_size,
+        hidden_size=self.attn_hidden_size,
         output_size=self.output_size,
         num_heads=self.num_heads,
         block_size=self.block_size)
@@ -76,6 +76,12 @@ class TransformerBlock(torch.nn.Module):
         self.norm2 = torch.nn.LayerNorm(self.output_size)
 
     def forward(self,x):
+        """
+        args:
+            x - (Nbatch, block_size, vec_size)
+
+
+        """
         o = self.norm1(x)
         o = self.attn_module(o)
         o = self.norm2(x+o)
@@ -83,3 +89,47 @@ class TransformerBlock(torch.nn.Module):
         o = self.activation(o)
         o = self.fc2(o)
         return x+o
+
+class GPT(torch.nn.Module):
+    def __init__(self, vocab_size, block_size, embed_size, hidden_size,
+    attn_hidden_size, output_size, num_transformer_blocks, num_heads,
+    activation=torch.nn.LeakyReLU(0.05)):
+        super(GPT, self).__init__()
+
+        self.vocab_size = vocab_size
+        self.block_size = block_size
+        self.embed_size = embed_size
+        self.attn_hidden_size = attn_hidden_size
+        self.output_size = output_size
+        self.num_transformer_blocks = num_transformer_blocks
+        self.num_heads = num_heads
+        self.activation = activation
+
+        self.embedder = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=embed_size)
+
+        self.transformer_blocks = torch.nn.ModuleList()
+        for n in range(num_transformer_blocks):
+            self.transformer_blocks.append(
+                TransformerBlock(block_size=block_size, vec_size=embed_size,
+                hidden_size=hidden_size, attn_hidden_size=attn_hidden_size,
+                output_size=embed_size,
+                num_heads=num_heads, activation=activation)
+            )
+
+        self.norm_out = torch.nn.LayerNorm(embed_size)
+        self.fc_out = torch.nn.Linear(embed_size, output_size, bias=False)
+
+    def forward(self,x):
+        """
+            x - (Nbatch, block_size), vectors of vocab ids
+        """
+
+        o = self.embedder(x) #now (Nbatch, block_size, embed_size)
+
+        for tb in self.transformer_blocks:
+            o = tb(o)
+
+        o = self.norm_out(o)
+        logits = self.fc_out(o) #now (Nbatch, block_size, vocab_size)
+
+        return logits

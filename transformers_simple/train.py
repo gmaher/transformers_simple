@@ -15,6 +15,8 @@ class Trainer:
         self.workers=workers
         self.device = device
 
+        self.loss_history = []
+
     def run(self):
         train_loader = DataLoader(
             self.dataset,
@@ -32,6 +34,7 @@ class Trainer:
                 data, target = data.to(self.device), target.to(self.device)
                 opt.zero_grad()
                 output = self.model(data)
+
                 loss = self.loss_fn(output, target)
                 loss.backward()
                 opt.step()
@@ -39,5 +42,7 @@ class Trainer:
                     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                         e, batch_idx * len(data), len(train_loader.dataset),
                         100. * batch_idx / len(train_loader), loss.item()))
+
+                    self.loss_history.append(loss.item())
 
         self.model.eval()
