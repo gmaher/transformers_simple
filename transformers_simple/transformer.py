@@ -4,7 +4,7 @@ import numpy as np
 
 class MultiHeadAttention(torch.nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_heads, block_size,
-    activation=torch.nn.Identity()):
+    attn_dropout=0.2, residual_dropout=0.2, activation=torch.nn.Identity()):
         super(MultiHeadAttention,self).__init__()
 
         self.input_size = input_size
@@ -22,6 +22,9 @@ class MultiHeadAttention(torch.nn.Module):
         1,1,self.block_size,self.block_size
         )
 
+        self.attn_dropout = torch.nn.Dropout(p=attn_dropout)
+        self.residual_dropout = torch.nn.Dropout(p=residual_dropout)
+
     def forward(self, x):
         """
             x - (Nbatch, Length, Vec size)
@@ -38,6 +41,7 @@ class MultiHeadAttention(torch.nn.Module):
         A = q @ k.transpose(-2,-1)/np.sqrt(self.hidden_size)
         A = A.masked_fill(self.mask[:,:,:l,:l] ==0, float('-inf'))
         A = F.softmax(A,dim=-1)
+        A = self.attn_dropout(A)
 
         o = A @ v #(nb, num_heads, l, hidden_size)
 
@@ -45,12 +49,14 @@ class MultiHeadAttention(torch.nn.Module):
         o = self.Wout(o)
 
         o = self.activation(o)
+        o = self.residual_dropout(o)
 
         return o
 
 class TransformerBlock(torch.nn.Module):
     def __init__(self, block_size, vec_size, hidden_size, attn_hidden_size,
-    output_size, num_heads, activation=torch.nn.Identity()):
+    output_size, num_heads, attn_dropout=0.2, attn_residual_dropout=0.2,
+    dropout=0.2, activation=torch.nn.Identity()):
 
         super(TransformerBlock, self).__init__()
 
@@ -67,13 +73,17 @@ class TransformerBlock(torch.nn.Module):
         hidden_size=self.attn_hidden_size,
         output_size=self.output_size,
         num_heads=self.num_heads,
-        block_size=self.block_size)
+        block_size=self.block_size,
+        attn_dropout=attn_dropout,
+        residual_dropout=attn_residual_dropout)
 
         self.fc1 = torch.nn.Linear(self.attn_output_size, self.hidden_size)
         self.fc2 = torch.nn.Linear(self.hidden_size, self.output_size)
 
         self.norm1 = torch.nn.LayerNorm(self.vec_size)
         self.norm2 = torch.nn.LayerNorm(self.output_size)
+
+        self.dropout=torch.nn.Dropout(p=dropout)
 
     def forward(self,x):
         """
@@ -87,8 +97,9 @@ class TransformerBlock(torch.nn.Module):
         o = self.norm2(x+o)
         o = self.fc1(o)
         o = self.activation(o)
-        o = self.fc2(o)
-        return x+o
+        o = x+self.fc2(o)
+        o = self.dropout(o)
+        return o
 
 class GPT(torch.nn.Module):
     def __init__(self, vocab_size, block_size, embed_size, hidden_size,
