@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 
 class Trainer:
     def __init__(self, model, dataset, loss_fn=torch.nn.MSELoss(), batch_size=8,
-    learning_rate=1e-3, epochs=1, log_interval=20, workers=0,
+    learning_rate=1e-3, epochs=1, log_interval=20, workers=0, grad_norm_clip=1.0,
     device=torch.device('cpu')):
         self.model = model
         self.dataset = dataset
@@ -14,6 +14,7 @@ class Trainer:
         self.log_interval = log_interval
         self.workers=workers
         self.device = device
+        self.grad_norm_clip = grad_norm_clip
 
         self.loss_history = []
 
@@ -36,6 +37,7 @@ class Trainer:
                 output = self.model(data)
 
                 loss = self.loss_fn(output, target)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_norm_clip)
                 loss.backward()
                 opt.step()
                 if batch_idx % self.log_interval == 0:

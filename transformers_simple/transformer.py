@@ -55,8 +55,8 @@ class MultiHeadAttention(torch.nn.Module):
 
 class TransformerBlock(torch.nn.Module):
     def __init__(self, block_size, vec_size, hidden_size, attn_hidden_size,
-    output_size, num_heads, attn_dropout=0.2, attn_residual_dropout=0.2,
-    dropout=0.2, activation=torch.nn.Identity()):
+    output_size, num_heads, attn_dropout=0.0, attn_residual_dropout=0.0,
+    dropout=0.0, activation=torch.nn.Identity()):
 
         super(TransformerBlock, self).__init__()
 
@@ -104,7 +104,9 @@ class TransformerBlock(torch.nn.Module):
 class GPT(torch.nn.Module):
     def __init__(self, vocab_size, block_size, embed_size, hidden_size,
     attn_hidden_size, output_size, num_transformer_blocks, num_heads,
-    embed_dropout=0.2, activation=torch.nn.LeakyReLU(0.05)):
+    embed_dropout=0.2, attn_dropout=0.2, residual_dropout=0.2,
+    attn_block_dropout=0.2,
+    activation=torch.nn.LeakyReLU(0.05)):
         super(GPT, self).__init__()
 
         self.vocab_size = vocab_size
@@ -126,7 +128,10 @@ class GPT(torch.nn.Module):
                 TransformerBlock(block_size=block_size, vec_size=embed_size,
                 hidden_size=hidden_size, attn_hidden_size=attn_hidden_size,
                 output_size=embed_size,
-                num_heads=num_heads, activation=activation)
+                num_heads=num_heads, activation=activation,
+                attn_dropout=attn_dropout,
+                attn_residual_dropout=residual_dropout,
+                dropout=attn_block_dropout)
             )
 
         self.norm_out = torch.nn.LayerNorm(embed_size)
