@@ -119,7 +119,7 @@ class GPT(torch.nn.Module):
         self.activation = activation
 
         self.embedder = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=embed_size)
-
+        self.pos_embedder = torch.nn.Embedding(num_embeddings=block_size, embedding_dim=embed_size)
         self.embed_dropout = torch.nn.Dropout(embed_dropout)
 
         self.transformer_blocks = torch.nn.ModuleList()
@@ -141,9 +141,13 @@ class GPT(torch.nn.Module):
         """
             x - (Nbatch, block_size), vectors of vocab ids
         """
+        b,t = x.size()
+        pos = torch.arange(0, t, dtype=torch.long).unsqueeze(0) # shape (1, t)
+
+        pos_e = self.pos_embedder(pos)
 
         o = self.embedder(x) #now (Nbatch, block_size, embed_size)
-        o = self.embed_dropout(o)
+        o = self.embed_dropout(o+pos_e)
         for tb in self.transformer_blocks:
             o = tb(o)
 

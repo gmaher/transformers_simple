@@ -33,3 +33,24 @@ class CharDataset(Dataset):
         x = torch.tensor(seq_ids[:-1], dtype=torch.long)
         y = torch.tensor(seq_ids[1:], dtype=torch.long)
         return x, y
+
+    def train_test_split(self, train_fraction=0.5):
+        Ns = int(train_fraction*self.length)
+
+        data_train = self.data[:Ns]
+        data_test = self.data[Ns:]
+
+        dataset_train = CharDataset(data=data_train, block_size=self.block_size)
+        dataset_test = CharDataset(data=data_test, block_size=self.block_size)
+
+        dataset_train.vocab = self.vocab
+        dataset_train.vocab_size = self.vocab_size
+        dataset_train.char_to_index = self.char_to_index
+        dataset_train.index_to_char = self.index_to_char
+
+        dataset_test.vocab = self.vocab
+        dataset_test.vocab_size = self.vocab_size
+        dataset_test.char_to_index = self.char_to_index
+        dataset_test.index_to_char = self.index_to_char
+
+        return dataset_train, dataset_test

@@ -1,11 +1,13 @@
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import numpy as np
 
 class Trainer:
     def __init__(self, model, dataset, loss_fn=torch.nn.MSELoss(), batch_size=8,
     learning_rate=1e-3, epochs=1, max_iters=None, log_interval=20, workers=0, grad_norm_clip=1.0,
-    device=torch.device('cpu'), val_dataset=None, val_interval=None):
+    device=torch.device('cpu'), val_dataset=None, val_interval=None, max_val_iters=None,
+    warmup_iters = 100, lr_decay_iters=1e4, min_lr=1e-4):
         self.model = model
         self.dataset = dataset
         self.loss_fn = loss_fn
@@ -19,9 +21,27 @@ class Trainer:
         self.grad_norm_clip = grad_norm_clip
         self.val_dataset = val_dataset
         self.val_interval = val_interval
+        self.max_val_iters = max_val_iters
+
+        self.warmup_iters = warmup_iters
+        self.lr_decay_iters = lr_decay_iters
+        self.min_lr = min_lr
+
         self.loss_history = []
         self.val_loss_history = []
         self.val_loss_iters = []
+
+    def get_lr(self, batch_idx):
+        if batch_idx <= self.warmup_iters:
+            return self.lr * batch_idx*1.0/self.warmup_iters
+
+        if batch_idx > self.lr_decay_iters:
+            return self.min_lr
+
+        decay_ratio = (batch_idx - self.warmup_iters)*1.0/(self.lr_decay_iters-self.warmup_iters)
+
+        coeff = 0.5 + (1.0 + np.cos(np.pi*decay_ratio))
+        return self.min_lr + coeff*(self.lr - self.min_lr)
 
     def evaluate_val_loss(self):
         val_loader = DataLoader(
@@ -40,6 +60,10 @@ class Trainer:
 
             val_loss += loss.item()*1.0/N
 
+            if self.max_val_iters is not None and batch_idx>=self.max_val_iters:
+                val_loss = val_loss*(N/self.max_val_iters)
+                break
+
         return val_loss
 
     def run(self):
@@ -54,8 +78,14 @@ class Trainer:
 
         self.model.train()
 
+        num_batches = 0
         for e in range(self.epochs):
             for batch_idx, (data, target) in enumerate(train_loader):
+                num_batches += 1
+                lr = self.get_lr(num_batches)
+                for pg in opt.param_groups:
+                    pg['lr'] = lr
+
                 data, target = data.to(self.device), target.to(self.device)
                 opt.zero_grad()
                 output = self.model(data)
